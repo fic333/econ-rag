@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ECON 154 Study System</title>
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --panel: #ffffff;
+    --ink: #16202c;
+    --muted: #5d6b7a;
+    --line: #dfe4ea;
+    --accent: #1d5b8f;
+    --accent-soft: #e8f0f8;
+    --good: #1c7a4a;
+    --good-soft: #e6f4ec;
+    --bad: #a52f34;
+    --bad-soft: #fbecec;
+    --radius: 10px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12161b; --panel: #1a2029; --ink: #e8edf2; --muted: #9aa8b6;
+      --line: #2b3542; --accent: #6fb3e8; --accent-soft: #1f2c3a;
+      --good: #6ed79f; --good-soft: #17301f; --bad: #f2999d; --bad-soft: #331b1d;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  header {
+    background: var(--panel); border-bottom: 1px solid var(--line);
+    padding: 14px 20px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
+  }
+  header h1 { font-size: 17px; margin: 0; font-weight: 650; }
+  header .sub { color: var(--muted); font-size: 13px; }
+  .spacer { flex: 1; }
+  .who { display: flex; gap: 8px; align-items: center; font-size: 13px; }
+  nav {
+    display: flex; gap: 4px; padding: 0 20px; background: var(--panel);
+    border-bottom: 1px solid var(--line); overflow-x: auto;
+  }
+  nav button {
+    background: none; border: none; border-bottom: 2px solid transparent;
+    padding: 11px 14px; font-size: 14px; color: var(--muted); cursor: pointer;
+    white-space: nowrap;
+  }
+  nav button.on { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+  main { max-width: 940px; margin: 0 auto; padding: 22px 16px 60px; }
+  section { display: none; }
+  section.on { display: block; }
+  .card {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 18px; margin-bottom: 16px;
+  }
+  h2 { font-size: 16px; margin: 0 0 12px; }
+  h3 { font-size: 14px; margin: 18px 0 8px; color: var(--muted); font-weight: 600;
+       text-transform: uppercase; letter-spacing: .04em; }
+  label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 5px; }
+  input[type=text], input[type=number], textarea, select {
+    width: 100%; padding: 9px 11px; border: 1px solid var(--line);
+    border-radius: 7px; background: var(--bg); color: var(--ink);
+    font: inherit;
+  }
+  textarea { resize: vertical; min-height: 62px; }
+  button.go {
+    background: var(--accent); color: #fff; border: none; border-radius: 7px;
+    padding: 9px 16px; font: inherit; font-weight: 600; cursor: pointer;
+  }
+  button.go:disabled { opacity: .5; cursor: default; }
+  button.ghost {
+    background: none; color: var(--accent); border: 1px solid var(--line);
+    border-radius: 7px; padding: 8px 13px; font: inherit; cursor: pointer;
+  }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+  .row > * { flex: 1 1 180px; }
+  .row > .fit { flex: 0 0 auto; }
+  .chips { display: flex; flex-wrap: wrap; gap: 7px; }
+  .chip {
+    border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px;
+    font-size: 13px; cursor: pointer; background: var(--panel); user-select: none;
+  }
+  .chip.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .chip small { color: var(--muted); font-weight: 400; }
+  .q { border-top: 1px solid var(--line); padding: 16px 0; }
+  .q:first-of-type { border-top: none; }
+  .q .stem { white-space: pre-wrap; font-weight: 500; margin-bottom: 10px; }
+  .q .meta { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+  .opt {
+    display: flex; gap: 10px; align-items: flex-start; padding: 8px 11px;
+    border: 1px solid var(--line); border-radius: 7px; margin-bottom: 6px;
+    cursor: pointer;
+  }
+  .opt:hover { border-color: var(--accent); }
+  .opt input { margin-top: 3px; }
+  .opt .letter { font-weight: 600; color: var(--muted); }
+  .opt.correct { background: var(--good-soft); border-color: var(--good); }
+  .opt.wrong { background: var(--bad-soft); border-color: var(--bad); }
+  .why {
+    margin-top: 8px; padding: 10px 12px; background: var(--bg);
+    border-left: 3px solid var(--accent); border-radius: 0 6px 6px 0; font-size: 14px;
+  }
+  .cite { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .score {
+    display: flex; gap: 22px; align-items: baseline; flex-wrap: wrap;
+    padding: 14px 16px; background: var(--accent-soft); border-radius: var(--radius);
+    margin-bottom: 16px;
+  }
+  .score .big { font-size: 30px; font-weight: 700; color: var(--accent); }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+  .bar { height: 7px; background: var(--line); border-radius: 4px; overflow: hidden; min-width: 90px; }
+  .bar i { display: block; height: 100%; background: var(--accent); }
+  .muted { color: var(--muted); }
+  .err { color: var(--bad); font-size: 14px; }
+  .src { border-top: 1px solid var(--line); padding: 11px 0; font-size: 14px; }
+  .src .head { font-weight: 600; font-size: 13px; }
+  .src p { margin: 5px 0 0; color: var(--muted); }
+  .pill { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 999px;
+          background: var(--accent-soft); color: var(--accent); margin-left: 6px; }
+  @media (max-width: 640px) { .row > * { flex: 1 1 100%; } }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>ECON 154 &mdash; The Global Economy</h1>
+    <div class="sub" id="corpus">loading&hellip;</div>
+  </div>
+  <div class="spacer"></div>
+  <div class="who">
+    <label for="user" style="margin:0">Student</label>
+    <input type="text" id="user" style="width:150px" placeholder="your name">
+  </div>
+</header>
+
+<nav>
+  <button data-tab="quiz" class="on">Take a quiz</button>
+  <button data-tab="ask">Ask the notes</button>
+  <button data-tab="teach">Teaching prep</button>
+  <button data-tab="history">History</button>
+  <button data-tab="progress">Progress</button>
+  <button data-tab="glossary">Glossary</button>
+</nav>
+
+<main>
+  <!-- ------------------------------------------------------------ QUIZ -->
+  <section id="tab-quiz" class="on">
+    <div class="card" id="quiz-setup">
+      <h2>Generate a practice quiz</h2>
+      <h3>Topics <span class="muted" style="text-transform:none">(none selected = all topics)</span></h3>
+      <div class="chips" id="topic-chips"></div>
+      <h3>Limit to lectures</h3>
+      <div class="chips" id="lecture-chips"></div>
+      <div class="row" style="margin-top:16px">
+        <div class="fit" style="width:130px">
+          <label for="nq">Questions</label>
+          <input type="number" id="nq" value="10" min="1" max="50">
+        </div>
+        <div class="fit">
+          <button class="go" id="make-quiz">Generate quiz</button>
+        </div>
+        <div class="fit">
+          <button class="ghost" id="clear-sel">Clear selection</button>
+        </div>
+      </div>
+      <div class="err" id="quiz-err" style="margin-top:10px"></div>
+    </div>
+    <div id="quiz-area"></div>
+  </section>
+
+  <!-- ------------------------------------------------------------- ASK -->
+  <section id="tab-ask">
+    <div class="card">
+      <h2>Ask a question about the lectures</h2>
+      <textarea id="ask-q" placeholder="e.g. Why does a higher price cause a movement along the demand curve rather than a shift?"></textarea>
+      <div class="row" style="margin-top:10px">
+        <div class="fit"><button class="go" id="ask-go">Ask</button></div>
+        <div class="fit muted" style="align-self:center">Answers are assembled from the lecture text and cited.</div>
+      </div>
+    </div>
+    <div id="ask-out"></div>
+  </section>
+
+  <!-- -------------------------------------------------------- TEACHING -->
+  <section id="tab-teach">
+    <div class="card">
+      <h2>Build a question bank</h2>
+      <p class="muted" style="margin-top:0">
+        Generates questions with the answer key and lecture sources shown, ready to
+        copy into an assignment or exam.
+      </p>
+      <h3>Topics</h3>
+      <div class="chips" id="teach-chips"></div>
+      <div class="row" style="margin-top:16px">
+        <div class="fit" style="width:130px">
+          <label for="teach-nq">Questions</label>
+          <input type="number" id="teach-nq" value="10" min="1" max="50">
+        </div>
+        <div class="fit"><button class="go" id="make-bank">Generate bank</button></div>
+        <div class="fit"><button class="ghost" id="copy-bank" disabled>Copy as Markdown</button></div>
+      </div>
+      <div class="err" id="teach-err" style="margin-top:10px"></div>
+    </div>
+    <div id="teach-out"></div>
+  </section>
+
+  <!-- --------------------------------------------------------- HISTORY -->
+  <section id="tab-history">
+    <div class="card">
+      <h2>Your quizzes</h2>
+      <div id="history-out" class="muted">No quizzes yet.</div>
+    </div>
+  </section>
+
+  <!-- -------------------------------------------------------- PROGRESS -->
+  <section id="tab-progress">
+    <div class="card">
+      <h2>Progress by topic</h2>
+      <div id="progress-out" class="muted">No completed quizzes yet.</div>
+    </div>
+  </section>
+
+  <!-- -------------------------------------------------------- GLOSSARY -->
+  <section id="tab-glossary">
+    <div class="card">
+      <h2>Course glossary</h2>
+      <p class="muted" style="margin-top:0">Definitions extracted from the lecture notes, with sources.</p>
+      <div id="glossary-out"></div>
+    </div>
+  </section>
+</main>
+
+<script>
+const $ = (s, r) => (r || document).querySelector(s);
+const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+const LETTERS = ["a", "b", "c", "d"];
+const state = { topics: [], lectures: [], selTopics: new Set(), selLectures: new Set(),
+                selTeach: new Set(), test: null, bank: null };
+
+function user() {
+  const value = $("#user").value.trim();
+  return value || "default_user";
+}
+function esc(text) {
+  return String(text == null ? "" : text).replace(/[&<>"']/g,
+    c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+async function api(path, options) {
+  const response = await fetch(path, options);
+  if (!response.ok) {
+    let detail = response.statusText;
+    try { detail = (await response.json()).detail || detail; } catch (e) {}
+    throw new Error(detail);
+  }
+  return response.headers.get("content-type").includes("json")
+    ? response.json() : response.text();
+}
+
+/* --------------------------------------------------------------- tabs -- */
+$$("nav button").forEach(button => button.onclick = () => {
+  $$("nav button").forEach(b => b.classList.toggle("on", b === button));
+  $$("main section").forEach(s => s.classList.toggle("on", s.id === "tab-" + button.dataset.tab));
+  if (button.dataset.tab === "history") loadHistory();
+  if (button.dataset.tab === "progress") loadProgress();
+  if (button.dataset.tab === "glossary") loadGlossary();
+});
+
+/* ---------------------------------------------------------- bootstrap -- */
+async function boot() {
+  const saved = localStorage.getItem("econ-rag-user");
+  if (saved) $("#user").value = saved;
+  $("#user").oninput = () => localStorage.setItem("econ-rag-user", $("#user").value);
+
+  const [stats, topics, lectures] = await Promise.all([
+    api("/api/stats"), api("/api/topics"), api("/api/lectures")
+  ]);
+  $("#corpus").textContent =
+    `${stats.documents} documents · ${stats.chunks} passages · ` +
+    `${stats.concepts} defined terms · ${stats.topics} topics`;
+
+  state.topics = topics.topics;
+  state.lectures = lectures.documents;
+  renderTopicChips($("#topic-chips"), state.selTopics);
+  renderTopicChips($("#teach-chips"), state.selTeach);
+
+  $("#lecture-chips").innerHTML = state.lectures.map(d =>
+    `<span class="chip" data-seq="${d.sequence}">${esc(d.citation)} <small>${d.pages}pp</small></span>`
+  ).join("");
+  $$("#lecture-chips .chip").forEach(chip => chip.onclick = () => {
+    const sequence = Number(chip.dataset.seq);
+    state.selLectures.has(sequence) ? state.selLectures.delete(sequence)
+                                    : state.selLectures.add(sequence);
+    chip.classList.toggle("on");
+  });
+}
+
+function renderTopicChips(host, selection) {
+  host.innerHTML = state.topics.map(topic =>
+    `<span class="chip" data-slug="${topic.slug}" title="${esc(topic.description)}">` +
+    `${esc(topic.name)} <small>${topic.chunk_count}</small></span>`
+  ).join("");
+  $$(".chip", host).forEach(chip => chip.onclick = () => {
+    const slug = chip.dataset.slug;
+    selection.has(slug) ? selection.delete(slug) : selection.add(slug);
+    chip.classList.toggle("on");
+  });
+}
+
+$("#clear-sel").onclick = () => {
+  state.selTopics.clear(); state.selLectures.clear();
+  $$("#topic-chips .chip, #lecture-chips .chip").forEach(c => c.classList.remove("on"));
+};
+
+/* --------------------------------------------------------------- quiz -- */
+$("#make-quiz").onclick = async () => {
+  const button = $("#make-quiz");
+  button.disabled = true; button.textContent = "Generating…"; $("#quiz-err").textContent = "";
+  try {
+    state.test = await api("/api/tests", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user_id: user(), mode: "self_test",
+        topics: [...state.selTopics], lectures: [...state.selLectures],
+        num_questions: Number($("#nq").value) || 10
+      })
+    });
+    renderQuiz();
+  } catch (error) {
+    $("#quiz-err").textContent = error.message;
+  } finally {
+    button.disabled = false; button.textContent = "Generate quiz";
+  }
+};
+
+function renderQuiz() {
+  const test = state.test;
+  const scope = test.topic_names.length ? test.topic_names.join(", ")
+              : (test.lectures && test.lectures.length
+                 ? "Lectures " + test.lectures.join(", ") : "All topics");
+  $("#quiz-area").innerHTML =
+    `<div class="card">
+       <h2>Quiz #${test.id} &mdash; ${esc(scope)}</h2>
+       <div class="muted" style="margin-bottom:6px">${test.num_questions} questions</div>
+       <div id="qs"></div>
+       <button class="go" id="submit-quiz" style="margin-top:14px">Submit answers</button>
+       <div class="err" id="submit-err" style="margin-top:8px"></div>
+     </div>`;
+  $("#qs").innerHTML = test.questions.map(question => `
+    <div class="q" data-qid="${question.id}">
+      <div class="meta">Question ${question.question_num} · ${esc(question.topic_name)}</div>
+      <div class="stem">${esc(question.question_text)}</div>
+      ${LETTERS.map(letter => `
+        <label class="opt" data-letter="${letter}">
+          <input type="radio" name="q${question.id}" value="${letter}">
+          <span class="letter">${letter})</span>
+          <span>${esc(question.options[letter])}</span>
+        </label>`).join("")}
+      <div class="feedback"></div>
+    </div>`).join("");
+  $("#submit-quiz").onclick = submitQuiz;
+  window.scrollTo({ top: $("#quiz-area").offsetTop - 20, behavior: "smooth" });
+}
+
+async function submitQuiz() {
+  const answers = {};
+  $$("#qs .q").forEach(node => {
+    const chosen = $(`input[name="q${node.dataset.qid}"]:checked`, node);
+    if (chosen) answers[node.dataset.qid] = chosen.value;
+  });
+  if (!Object.keys(answers).length) {
+    $("#submit-err").textContent = "Answer at least one question first.";
+    return;
+  }
+  const button = $("#submit-quiz");
+  button.disabled = true; button.textContent = "Grading…";
+  try {
+    const graded = await api(`/api/tests/${state.test.id}/submit`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ answers })
+    });
+    showResults(graded);
+  } catch (error) {
+    $("#submit-err").textContent = error.message;
+    button.disabled = false; button.textContent = "Submit answers";
+  }
+}
+
+function showResults(test) {
+  $("#submit-quiz").remove();
+  const byId = Object.fromEntries(test.questions.map(q => [q.id, q]));
+  $$("#qs .q").forEach(node => {
+    const question = byId[node.dataset.qid];
+    $$(".opt", node).forEach(option => {
+      const letter = option.dataset.letter;
+      $("input", option).disabled = true;
+      if (letter === question.correct_option) option.classList.add("correct");
+      else if (letter === question.user_answer) option.classList.add("wrong");
+    });
+    $(".feedback", node).innerHTML =
+      `<div class="why"><strong>${question.is_correct ? "Correct" : "Not quite"}.</strong>
+         ${esc(question.explanation)}
+         <div class="cite">Source: ${esc(question.source_citation)}</div>
+       </div>`;
+  });
+  const card = $("#quiz-area .card");
+  const banner = document.createElement("div");
+  banner.className = "score";
+  banner.innerHTML =
+    `<span class="big">${test.score}%</span>
+     <span>${test.num_correct} of ${test.num_questions} correct</span>
+     <span class="muted">Quiz #${test.id}</span>`;
+  card.insertBefore(banner, $("#qs"));
+  window.scrollTo({ top: card.offsetTop - 20, behavior: "smooth" });
+}
+
+/* ---------------------------------------------------------------- ask -- */
+$("#ask-go").onclick = async () => {
+  const query = $("#ask-q").value.trim();
+  if (query.length < 3) return;
+  const button = $("#ask-go");
+  button.disabled = true; button.textContent = "Searching…";
+  $("#ask-out").innerHTML = "";
+  try {
+    const result = await api("/api/ask", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query, user_id: user(), top_k: 5 })
+    });
+    $("#ask-out").innerHTML =
+      `<div class="card"><h2>Answer</h2><p>${esc(result.answer)}</p>
+        ${result.concepts.length ? "<h3>Relevant definitions</h3>" +
+          result.concepts.map(c =>
+            `<div class="src"><div class="head">${esc(c.term)}</div>
+               <p>${esc(c.definition)}</p>
+               <div class="cite">${esc(c.citation)}</div></div>`).join("") : ""}
+       </div>
+       <div class="card"><h2>Passages used</h2>
+        ${result.sources.map(source => `
+          <div class="src">
+            <div class="head">${esc(source.citation)}
+              <span class="pill">${esc(source.topic_name)}</span></div>
+            <p>${esc(source.text.slice(0, 420))}${source.text.length > 420 ? "…" : ""}</p>
+          </div>`).join("")}
+       </div>`;
+  } catch (error) {
+    $("#ask-out").innerHTML = `<div class="card err">${esc(error.message)}</div>`;
+  } finally {
+    button.disabled = false; button.textContent = "Ask";
+  }
+};
+
+/* ----------------------------------------------------------- teaching -- */
+$("#make-bank").onclick = async () => {
+  const button = $("#make-bank");
+  button.disabled = true; button.textContent = "Generating…"; $("#teach-err").textContent = "";
+  try {
+    state.bank = await api("/api/tests", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user_id: user(), mode: "teaching", topics: [...state.selTeach],
+        num_questions: Number($("#teach-nq").value) || 10
+      })
+    });
+    const scope = state.bank.topic_names.join(", ") || "All topics";
+    $("#teach-out").innerHTML =
+      `<div class="card"><h2>Question bank &mdash; ${esc(scope)}</h2>
+        ${state.bank.questions.map(question => `
+          <div class="q">
+            <div class="meta">Question ${question.question_num} · ${esc(question.topic_name)}
+              · <span class="muted">${esc(question.kind)}</span></div>
+            <div class="stem">${esc(question.question_text)}</div>
+            ${LETTERS.map(letter => `
+              <div class="opt ${letter === question.correct_option ? "correct" : ""}">
+                <span class="letter">${letter})</span>
+                <span>${esc(question.options[letter])}</span>
+              </div>`).join("")}
+            <div class="why">${esc(question.explanation)}
+              <div class="cite">Source: ${esc(question.source_citation)}</div></div>
+          </div>`).join("")}
+       </div>`;
+    $("#copy-bank").disabled = false;
+  } catch (error) {
+    $("#teach-err").textContent = error.message;
+  } finally {
+    button.disabled = false; button.textContent = "Generate bank";
+  }
+};
+
+$("#copy-bank").onclick = async () => {
+  if (!state.bank) return;
+  const markdown = await api(`/api/tests/${state.bank.id}/export`);
+  try {
+    await navigator.clipboard.writeText(markdown);
+    $("#copy-bank").textContent = "Copied";
+    setTimeout(() => $("#copy-bank").textContent = "Copy as Markdown", 1600);
+  } catch (error) {
+    // Clipboard access can be blocked; show the Markdown so it can be selected.
+    $("#teach-out").insertAdjacentHTML("afterbegin",
+      `<div class="card"><h2>Markdown</h2>
+        <textarea style="min-height:320px">${esc(markdown)}</textarea></div>`);
+  }
+};
+
+/* ------------------------------------------------------------ history -- */
+async function loadHistory() {
+  const { tests } = await api(`/api/tests?user_id=${encodeURIComponent(user())}`);
+  if (!tests.length) { $("#history-out").innerHTML = "No quizzes yet."; return; }
+  $("#history-out").innerHTML =
+    `<table><thead><tr><th>Quiz</th><th>Scope</th><th>Mode</th><th>Questions</th>
+      <th>Score</th><th>Date</th></tr></thead><tbody>
+      ${tests.map(test => `
+        <tr>
+          <td>#${test.id}</td>
+          <td>${esc(test.topic_names.join(", ")
+                || (test.lectures || []).map(l => "Lecture " + l).join(", ")
+                || "All topics")}</td>
+          <td>${esc(test.mode)}</td>
+          <td>${test.num_questions}</td>
+          <td>${test.status === "completed"
+                ? `<strong>${test.score}%</strong> (${test.num_correct}/${test.num_questions})`
+                : '<span class="muted">in progress</span>'}</td>
+          <td class="muted">${esc(test.created_date.slice(0, 16).replace("T", " "))}</td>
+        </tr>`).join("")}
+     </tbody></table>`;
+}
+
+/* ----------------------------------------------------------- progress -- */
+async function loadProgress() {
+  const data = await api(`/api/progress?user_id=${encodeURIComponent(user())}`);
+  if (!data.questions_answered) {
+    $("#progress-out").innerHTML = "No completed quizzes yet.";
+    return;
+  }
+  $("#progress-out").innerHTML =
+    `<div class="score">
+       <span class="big">${data.overall_accuracy}%</span>
+       <span>${data.questions_answered} questions answered</span>
+       <span>${data.tests_completed} quizzes completed</span>
+       <span class="muted">average score ${data.average_score}%</span>
+     </div>
+     ${data.weakest_topics.length ? `<h3>Focus next on</h3>
+       <div class="chips">${data.weakest_topics.map(t =>
+         `<span class="chip">${esc(t.topic_name)} <small>${t.accuracy}%</small></span>`
+       ).join("")}</div>` : ""}
+     <h3>All topics</h3>
+     <table><thead><tr><th>Topic</th><th>Accuracy</th><th></th><th>Answered</th></tr></thead>
+       <tbody>${data.topics.map(topic => `
+         <tr>
+           <td>${esc(topic.topic_name)}</td>
+           <td>${topic.accuracy}%</td>
+           <td><div class="bar"><i style="width:${topic.accuracy}%"></i></div></td>
+           <td class="muted">${topic.correct}/${topic.attempted}</td>
+         </tr>`).join("")}
+       </tbody></table>`;
+}
+
+/* ----------------------------------------------------------- glossary -- */
+async function loadGlossary() {
+  const { concepts } = await api("/api/concepts");
+  $("#glossary-out").innerHTML = concepts.map(concept =>
+    `<div class="src">
+       <div class="head">${esc(concept.term)}<span class="pill">${esc(concept.topic_name)}</span></div>
+       <p>${esc(concept.definition)}</p>
+       <div class="cite">${esc(concept.citation)}</div>
+     </div>`).join("");
+}
+
+boot();
+</script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+Metadata-Version: 2.4
+Name: econ-rag
+Version: 0.1.0
+Summary: Retrieval-augmented study and test-generation system for intro economics
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: pypdf>=4.0
+Requires-Dist: sentence-transformers>=2.2
+Requires-Dist: sqlalchemy>=2.0
+Requires-Dist: fastapi>=0.104
+Requires-Dist: uvicorn>=0.24
+Requires-Dist: pydantic>=2.0
+Requires-Dist: pydantic-settings>=2.0
+Requires-Dist: numpy>=1.24
+Requires-Dist: click>=8.0
