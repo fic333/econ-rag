@@ -79,7 +79,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .mode-card button:hover { background: #2980b9; }
 .study-area { display: none; background: white; border-radius: 12px; padding: 30px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
 .study-area.active { display: block; }
-.flashcard-container { perspective: 1000px; height: 400px; margin-bottom: 30px; }
+.flashcard-container { perspective: 1000px; height: 400px; margin-bottom: 30px; max-width: 600px; }
 .flashcard { width: 100%; height: 100%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; padding: 40px; color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; cursor: pointer; transition: transform 0.6s; transform-style: preserve-3d; box-shadow: 0 8px 20px rgba(0,0,0,0.2); position: relative; }
 .flashcard.flipped { transform: rotateY(180deg); }
 .flashcard-face { position: absolute; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; backface-visibility: hidden; }
@@ -87,7 +87,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .flashcard-back { transform: rotateY(180deg); background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
 .flashcard h2 { font-size: 32px; margin-bottom: 20px; }
 .flashcard-label { position: absolute; top: 20px; right: 20px; font-size: 12px; opacity: 0.8; background: rgba(255,255,255,0.2); padding: 5px 10px; border-radius: 4px; }
-.flashcard-nav { display: flex; justify-content: space-between; gap: 20px; margin-bottom: 20px; }
+.flashcard-nav { display: flex; justify-content: space-between; gap: 20px; margin-bottom: 20px; max-width: 600px; }
 .btn { padding: 12px 30px; background: #3498db; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
 .btn:hover { background: #2980b9; }
 .progress-bar { width: 100%; height: 8px; background: #ecf0f1; border-radius: 4px; margin-bottom: 30px; overflow: hidden; }
@@ -189,7 +189,23 @@ input, select { width: 100%; max-width: 400px; padding: 12px; margin-bottom: 15p
 
     <div id="quiz" class="study-area">
         <h2>❓ Quiz</h2>
-        <input type="number" id="numQuestions" placeholder="Number of questions" value="10" />
+        <div class="form-group">
+            <label>Number of Questions:</label>
+            <input type="number" id="numQuestions" placeholder="Number of questions" value="10" />
+        </div>
+        <button class="btn" style="width: auto; margin-bottom: 20px;" onclick="showQuizTopicsForm()">+ Select Topics</button>
+
+        <div id="quizTopicsForm" style="display: none; background: #f9f9f9; padding: 20px; border-radius: 8px; margin-bottom: 20px;" class="form-container">
+            <h3>Filter by Topics (optional)</h3>
+            <div class="form-group">
+                <label>Topics (select any to filter):</label>
+                <div class="topics-grid" id="quizTopicsGrid"></div>
+            </div>
+            <div class="btn-group">
+                <button class="btn" style="background: #95a5a6;" onclick="showQuizTopicsForm()">Done</button>
+            </div>
+        </div>
+
         <button class="btn" onclick="generateQuiz()">Generate Quiz</button>
         <div id="quizContent"></div>
     </div>
@@ -362,14 +378,62 @@ function previousCard() {
     }
 }
 
+function showQuizTopicsForm() {
+    const form = document.getElementById("quizTopicsForm");
+    if (form.style.display === "none") {
+        form.style.display = "block";
+        renderQuizTopicsGrid();
+    } else {
+        form.style.display = "none";
+    }
+}
+
+function renderQuizTopicsGrid() {
+    const grid = document.getElementById("quizTopicsGrid");
+    grid.innerHTML = "";
+    TOPICS_LIST.forEach(topic => {
+        const tile = document.createElement("div");
+        tile.className = "topic-tile";
+        tile.id = `quiz-topic-${topic.slug}`;
+        tile.innerHTML = `
+            <input type="checkbox" id="quiz-check-${topic.slug}" onchange="updateQuizTopicTile('${topic.slug}')">
+            <label for="quiz-check-${topic.slug}">${topic.name}</label>
+        `;
+        grid.appendChild(tile);
+    });
+}
+
+function updateQuizTopicTile(slug) {
+    const tile = document.getElementById(`quiz-topic-${slug}`);
+    const check = document.getElementById(`quiz-check-${slug}`);
+    if (check.checked) {
+        tile.classList.add("checked");
+    } else {
+        tile.classList.remove("checked");
+    }
+}
+
 async function generateQuiz() {
     const num = document.getElementById("numQuestions").value;
+
+    // Collect selected topics
+    const selectedTopics = [];
+    TOPICS_LIST.forEach(topic => {
+        const check = document.getElementById(`quiz-check-${topic.slug}`);
+        if (check && check.checked) {
+            selectedTopics.push(topic.slug);
+        }
+    });
+
     document.getElementById("quizContent").innerHTML = "<p>Generating quiz...</p>";
-    
+
     const response = await fetch("/api/tests/create", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({ num_questions: parseInt(num) })
+        body: JSON.stringify({
+            num_questions: parseInt(num),
+            topics: selectedTopics.length > 0 ? selectedTopics : undefined
+        })
     });
     const test = await response.json();
     document.getElementById("quizContent").innerHTML = `<p>Quiz created with ${test.question_count} questions</p>`;
@@ -473,13 +537,12 @@ async def get_flashcard_set(set_id: int):
 async def create_test(request: TestRequest):
     """Create a new quiz."""
     try:
-        test = test_gen.generate_test(
-            user_id="default_user",
-            num_questions=request.num_questions,
+        questions = test_gen.build_questions(
             topics=request.topics,
             lectures=request.lectures,
+            num_questions=request.num_questions,
         )
-        return {"test_id": test.id, "question_count": len(test.questions)}
+        return {"test_id": 1, "question_count": len(questions)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
