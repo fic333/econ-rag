@@ -432,4 +432,7 @@ async def ask(request: QueryRequest):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    import os
+    port = int(os.getenv("ECON_PORT", settings.API_PORT or 8100))
+    print(f"Starting Economics RAG on http://127.0.0.1:{port}/")
+    uvicorn.run(app, host="0.0.0.0", port=port)
