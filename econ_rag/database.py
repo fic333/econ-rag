@@ -219,6 +219,54 @@ class QueryHistory(Base):
     timestamp = Column(DateTime, default=datetime.utcnow)
 
 
+class FlashcardSet(Base):
+    """A collection of flashcards for study."""
+
+    __tablename__ = "flashcard_sets"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(String(255), nullable=False, default="default_user")
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    topics = Column(JSON, nullable=True)
+    lectures = Column(JSON, nullable=True)
+    card_count = Column(Integer, default=0)
+    created_date = Column(DateTime, default=datetime.utcnow)
+    updated_date = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    cards = relationship(
+        "Flashcard",
+        back_populates="set",
+        cascade="all, delete-orphan",
+        order_by="Flashcard.card_num",
+    )
+
+    __table_args__ = (Index("idx_flashcard_set_user", "user_id"),)
+
+
+class Flashcard(Base):
+    """An individual flashcard (term/front, definition/back, source)."""
+
+    __tablename__ = "flashcards"
+
+    id = Column(Integer, primary_key=True)
+    set_id = Column(Integer, ForeignKey("flashcard_sets.id"), nullable=False)
+    card_num = Column(Integer, nullable=False)
+    front = Column(Text, nullable=False)  # Question/term
+    back = Column(Text, nullable=False)  # Answer/definition
+    source_concept_id = Column(Integer, ForeignKey("concepts.id"), nullable=True)
+    source_chunk_id = Column(Integer, ForeignKey("chunks.id"), nullable=True)
+    citation = Column(String(500), nullable=True)
+    topic = Column(String(64), nullable=True)
+    card_type = Column(String(32), nullable=True)  # "definition", "cloze", "short_answer"
+
+    set = relationship("FlashcardSet", back_populates="cards")
+    source_concept = relationship("Concept")
+    source_chunk = relationship("Chunk")
+
+    __table_args__ = (Index("idx_flashcard_set", "set_id"),)
+
+
 def get_engine():
     """Return the process-wide SQLAlchemy engine."""
     global _engine, _SessionLocal
