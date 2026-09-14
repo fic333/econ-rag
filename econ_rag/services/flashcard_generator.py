@@ -85,16 +85,9 @@ class FlashcardGenerator:
             self.session.add(card)
             card_num += 1
 
-        # Create cloze flashcards from passages (optional rich content)
-        if card_num < 50:  # Limit total cards per set
-            cloze_cards = self._generate_cloze_cards(
-                flashcard_set.id, topics, lectures, card_num
-            )
-            for card in cloze_cards:
-                if card_num >= 50:
-                    break
-                self.session.add(card)
-                card_num += 1
+        # Cloze cards disabled temporarily—definition cards work better
+        # (Cloze generation was including heading text and creating confusing blanks)
+        # Re-enable with improved sentence filtering if needed
 
     def _generate_cloze_cards(
         self,
@@ -118,6 +111,7 @@ class FlashcardGenerator:
         chunks = query.limit(20).all()
 
         # Simple cloze: blank out key terms in sentences
+        import re
         for chunk in chunks:
             sentences = chunk.content.split(". ")
             for i, sentence in enumerate(sentences[:3]):
@@ -129,24 +123,30 @@ class FlashcardGenerator:
                 for concept in self.session.query(Concept).filter(
                     Concept.chunk_id == chunk.id
                 ).all():
-                    if concept.term.lower() in sentence.lower():
-                        # Create cloze: blank out the term
-                        blanked = sentence.replace(
-                            concept.term, "_" * len(concept.term)
-                        )
+                    term_lower = concept.term.lower()
+                    if term_lower not in sentence.lower():
+                        continue
 
-                        card = Flashcard(
-                            set_id=set_id,
-                            card_num=start_num + len(cards),
-                            front=f"{blanked}",
-                            back=concept.term,
-                            source_chunk_id=chunk.id,
-                            citation=chunk.citation,
-                            topic=chunk.topic,
-                            card_type="cloze",
-                        )
-                        cards.append(card)
-                        break
+                    # Skip if sentence starts with the term (likely a heading/label)
+                    if sentence.strip().lower().startswith(term_lower):
+                        continue
+
+                    # Blank only the FIRST occurrence (case-insensitive)
+                    pattern = re.compile(re.escape(concept.term), re.IGNORECASE)
+                    blanked = pattern.sub("_" * len(concept.term), sentence, count=1)
+
+                    card = Flashcard(
+                        set_id=set_id,
+                        card_num=start_num + len(cards),
+                        front=f"{blanked.strip()}",
+                        back=concept.term,
+                        source_chunk_id=chunk.id,
+                        citation=chunk.citation,
+                        topic=chunk.topic,
+                        card_type="cloze",
+                    )
+                    cards.append(card)
+                    break
 
         return cards[:20]
 
