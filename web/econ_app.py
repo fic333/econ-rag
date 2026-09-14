@@ -92,9 +92,18 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .btn:hover { background: #2980b9; }
 .progress-bar { width: 100%; height: 8px; background: #ecf0f1; border-radius: 4px; margin-bottom: 30px; overflow: hidden; }
 .progress-fill { height: 100%; background: #3498db; width: 0%; transition: width 0.3s; }
-input, select { width: 100%; padding: 12px; margin-bottom: 15px; border: 2px solid #ddd; border-radius: 6px; font-size: 16px; }
+input, select { width: 100%; max-width: 400px; padding: 12px; margin-bottom: 15px; border: 2px solid #ddd; border-radius: 6px; font-size: 16px; }
 .form-group { margin-bottom: 20px; }
 .form-group label { display: block; margin-bottom: 8px; font-weight: bold; color: #2c3e50; }
+.topics-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-top: 10px; }
+.topic-tile { background: white; border: 2px solid #ddd; border-radius: 6px; padding: 12px 10px; cursor: pointer; text-align: center; user-select: none; transition: all 0.2s; font-size: 13px; }
+.topic-tile:hover { border-color: #3498db; background: #f0f8ff; }
+.topic-tile input { width: 16px; height: 16px; margin: 0 0 6px 0; cursor: pointer; }
+.topic-tile label { cursor: pointer; display: block; font-weight: 500; word-break: break-word; }
+.topic-tile.checked { border-color: #3498db; background: #d6eaf8; box-shadow: 0 0 0 1px #3498db; }
+.form-container { max-width: 600px; }
+.btn-group { display: flex; gap: 10px; }
+.btn-group .btn { flex: 1; margin: 0; }
 </style>
 </head>
 <body>
@@ -141,17 +150,20 @@ input, select { width: 100%; padding: 12px; margin-bottom: 15px; border: 2px sol
         </div>
         <button class="btn" style="width: auto; margin-bottom: 20px;" onclick="showCreateFlashcardForm()">+ Create New Set</button>
         
-        <div id="flashcardCreateForm" style="display: none; background: #f9f9f9; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+        <div id="flashcardCreateForm" style="display: none; background: #f9f9f9; padding: 20px; border-radius: 8px; margin-bottom: 20px;" class="form-container">
             <h3>Create Flashcard Set</h3>
             <div class="form-group">
                 <label>Set Name:</label>
                 <input type="text" id="flashcardName" placeholder="e.g., Supply & Demand Basics" />
             </div>
             <div class="form-group">
-                <label>Topics (comma-separated):</label>
-                <input type="text" id="flashcardTopics" placeholder="e.g., equilibrium, demand-supply" />
+                <label>Topics (select any to filter):</label>
+                <div class="topics-grid" id="topicsGrid"></div>
             </div>
-            <button class="btn" onclick="createFlashcardSet()">Create</button>
+            <div class="btn-group">
+                <button class="btn" onclick="createFlashcardSet()">Create</button>
+                <button class="btn" style="background: #95a5a6;" onclick="showCreateFlashcardForm()">Cancel</button>
+            </div>
         </div>
 
         <div id="flashcardDisplay">
@@ -230,18 +242,71 @@ async function loadFlashcardSets() {
     });
 }
 
+const TOPICS_LIST = [
+    {slug: "what-is-economics", name: "What Is Economics"},
+    {slug: "scarcity-choice", name: "Scarcity, Choice, and Tradeoffs"},
+    {slug: "opportunity-cost", name: "Opportunity Cost"},
+    {slug: "incentives", name: "Incentives"},
+    {slug: "marginal-analysis", name: "Marginal Reasoning"},
+    {slug: "economic-reasoning", name: "Positive vs Normative, Correlation vs Causation"},
+    {slug: "models-ppf", name: "Economic Models, Ceteris Paribus, and the PPF"},
+    {slug: "global-economy", name: "The Global Economy"},
+    {slug: "data-literacy", name: "Economic Data Literacy"},
+    {slug: "demand", name: "Demand and the Law of Demand"},
+    {slug: "consumer-choice", name: "Willingness to Pay and Consumer Choice"},
+    {slug: "demand-shifts", name: "Shifts in Demand"},
+    {slug: "firms-costs", name: "Firms, Revenue, Costs, and Profit"},
+    {slug: "supply", name: "Supply and the Law of Supply"},
+    {slug: "supply-shifts", name: "Shifts in Supply"},
+    {slug: "equilibrium", name: "Market Equilibrium"},
+    {slug: "shortage-surplus", name: "Shortages, Surpluses, and Price Adjustment"},
+    {slug: "comparative-statics", name: "Comparative Statics"}
+];
+
 function showCreateFlashcardForm() {
-    document.getElementById("flashcardCreateForm").style.display = 
-        document.getElementById("flashcardCreateForm").style.display === "none" ? "block" : "none";
+    const form = document.getElementById("flashcardCreateForm");
+    const show = form.style.display === "none";
+    form.style.display = show ? "block" : "none";
+    if (show) {
+        document.getElementById("flashcardName").value = "";
+        renderTopicsGrid();
+    }
+}
+
+function renderTopicsGrid() {
+    const grid = document.getElementById("topicsGrid");
+    grid.innerHTML = "";
+    TOPICS_LIST.forEach(topic => {
+        const tile = document.createElement("div");
+        tile.className = "topic-tile";
+        tile.id = `topic-${topic.slug}`;
+        tile.innerHTML = `
+            <input type="checkbox" id="check-${topic.slug}" onchange="updateTopicTile('${topic.slug}')">
+            <label for="check-${topic.slug}">${topic.name}</label>
+        `;
+        grid.appendChild(tile);
+    });
+}
+
+function updateTopicTile(slug) {
+    const tile = document.getElementById(`topic-${slug}`);
+    const check = document.getElementById(`check-${slug}`);
+    if (check.checked) {
+        tile.classList.add("checked");
+    } else {
+        tile.classList.remove("checked");
+    }
 }
 
 async function createFlashcardSet() {
     const name = document.getElementById("flashcardName").value.trim();
-    const topicsStr = document.getElementById("flashcardTopics").value.trim();
     if (!name) { alert("Enter set name"); return; }
-    
-    const topics = topicsStr ? topicsStr.split(",").map(t => t.trim()) : null;
-    
+
+    const selectedTopics = Array.from(document.querySelectorAll(".topic-tile input:checked"))
+        .map(el => el.id.replace("check-", ""));
+
+    const topics = selectedTopics.length > 0 ? selectedTopics : null;
+
     const response = await fetch("/api/flashcards/sets", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
@@ -433,6 +498,6 @@ async def ask(request: QueryRequest):
 if __name__ == "__main__":
     import uvicorn
     import os
-    port = int(os.getenv("ECON_PORT", settings.API_PORT or 8100))
-    print(f"Starting Economics RAG on http://127.0.0.1:{port}/")
+    port = int(os.getenv("ECON_PORT", "8101"))  # Use 8101 for flashcards to avoid cache conflict
+    print(f"🎓 Starting Economics RAG Flashcard App on http://127.0.0.1:{port}/")
     uvicorn.run(app, host="0.0.0.0", port=port)
