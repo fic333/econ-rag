@@ -88,7 +88,7 @@ class FlashcardGenerator:
         # Create cloze flashcards from passages (optional rich content)
         if card_num < 50:  # Limit total cards per set
             cloze_cards = self._generate_cloze_cards(
-                topics, lectures, card_num
+                flashcard_set.id, topics, lectures, card_num
             )
             for card in cloze_cards:
                 if card_num >= 50:
@@ -98,6 +98,7 @@ class FlashcardGenerator:
 
     def _generate_cloze_cards(
         self,
+        set_id: int,
         topics: Optional[List[str]],
         lectures: Optional[List[int]],
         start_num: int = 1,
@@ -135,6 +136,7 @@ class FlashcardGenerator:
                         )
 
                         card = Flashcard(
+                            set_id=set_id,
                             card_num=start_num + len(cards),
                             front=f"{blanked}",
                             back=concept.term,
