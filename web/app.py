@@ -17,12 +17,17 @@ from econ_rag.config import settings as econ_settings
 try:
     from nursing_rag.services.rag_engine import RAGEngine as NursingRAGEngine
     from nursing_rag.services.test_generator import TestGenerator as NursingTestGenerator
-    from nursing_rag.database import get_session as nursing_get_session, Document as NursingDocument, Concept as NursingConcept
+    from nursing_rag.database import get_session as nursing_get_session, Document as NursingDocument
     from nursing_rag.config import settings as nursing_settings
+    try:
+        from nursing_rag.database import Concept as NursingConcept
+    except ImportError:
+        NursingConcept = None
     NURSING_AVAILABLE = True
-except ImportError:
+except Exception as e:
     NURSING_AVAILABLE = False
     NursingConcept = None
+    print("NURSING DISABLED:", type(e).__name__, e)
 
 # Initialize FastAPI
 app = FastAPI(
@@ -175,6 +180,13 @@ button.search-btn:hover, button.test-btn:hover {{ background: {color}cc; }}
 .loading {{ color: {color}; font-style: italic; }}
 .error {{ color: #e74c3c; background: #fadbd8; padding: 10px; border-radius: 4px; }}
 .success {{ color: #27ae60; background: #d5f4e6; padding: 10px; border-radius: 4px; }}
+.topics-section {{ margin: 16px 0; }}
+.topics-section label {{ display: block; margin-bottom: 8px; font-weight: bold; color: #2c3e50; }}
+.topics-grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; margin-bottom: 16px; }}
+.topic-tile {{ background: white; border: 2px solid #e0e0e0; border-radius: 6px; padding: 12px 8px; cursor: pointer; text-align: center; user-select: none; }}
+.topic-tile input {{ width: 16px; height: 16px; margin-bottom: 6px; cursor: pointer; }}
+.topic-tile label {{ cursor: pointer; display: block; font-size: 13px; font-weight: 500; }}
+.topic-tile.checked {{ border-color: #3498db; background: #d6eaf8; }}
 </style>
 </head>
 <body>
@@ -194,6 +206,7 @@ button.search-btn:hover, button.test-btn:hover {{ background: {color}cc; }}
     <div class="nav-tabs">
         <button class="active" onclick="switchTab('search')">Search</button>
         <button onclick="switchTab('test')">Generate Test</button>
+        <button onclick="switchTab('flashcards')">Flashcards</button>
         <button onclick="switchTab('history')">History</button>
     </div>
     <div id="search" class="tab-content active">
@@ -202,11 +215,30 @@ button.search-btn:hover, button.test-btn:hover {{ background: {color}cc; }}
         <button class="search-btn" onclick="search()">Search</button>
         <div id="searchResults"></div>
     </div>
-    <div id="test" class="tab-content">
+        <div id="test" class="tab-content">
         <h2>Generate Test</h2>
+        <select id="testType">
+            <option value="general">General (Mixed Topics)</option>
+            <option value="specific">Specific Topic</option>
+            <option value="nclex">NCLEX Style</option>
+        </select>
         <input type="number" id="numQuestions" placeholder="Number of questions" value="10" />
+        <div class="topics-section">
+            <label>Topics (optional — leave empty for all):</label>
+            <div id="topicsTiles" class="topics-grid"></div>
+        </div>
         <button class="test-btn" onclick="generateTest()">Generate</button>
         <div id="testContent"></div>
+    </div>
+    <div id="flashcards" class="tab-content">
+        <h2>Flashcards</h2>
+        <input type="text" id="setName" placeholder="Set name (e.g., 'Lecture 2 Vocab')" />
+        <select id="flashcardType">
+            <option value="concepts">From Concepts</option>
+            <option value="custom">Custom Set</option>
+        </select>
+        <button class="test-btn" onclick="createFlashcardSet()">Create Set</button>
+        <div id="flashcardsContent" style="margin-top: 20px;"></div>
     </div>
     <div id="history" class="tab-content">
         <h2>Test History</h2>
@@ -271,36 +303,135 @@ async function search() {{
     }}
 }}
 
+function selectedTopics() {{
+    const boxes = document.querySelectorAll('#topicsTiles input.topic-checkbox:checked');
+    const vals = Array.from(boxes).map(cb => cb.getAttribute('data-topic'));
+    return vals.length ? vals : null;
+}}
+
+function toggleTopic(event, tileId) {{
+    const tile = document.getElementById(tileId);
+    const box = tile.querySelector('input');
+    if (event.target !== box) box.checked = !box.checked;
+    tile.classList.toggle('checked', box.checked);
+}}
+
+async function loadTopics() {{
+    const grid = document.getElementById('topicsTiles');
+    if (!grid) return;
+    try {{
+        const response = await fetch(`${{API_PREFIX}}/topics`);
+        const data = await response.json();
+        const topics = data.topics || data || [];
+        grid.innerHTML = topics.map(topic => {{
+            const id = 'tile-' + String(topic).replace(/[^a-z0-9]/gi, '').substring(0, 24);
+            return `<div class="topic-tile" id="${{id}}" onclick="toggleTopic(event, '${{id}}')">
+                <input type="checkbox" class="topic-checkbox" data-topic="${{topic}}" />
+                <label>${{topic}}</label>
+            </div>`;
+        }}).join('');
+    }} catch (e) {{
+        grid.innerHTML = `<p class="error">Could not load topics: ${{e.message}}</p>`;
+    }}
+}}
+
 async function generateTest() {{
     const num = document.getElementById('numQuestions').value;
+    const testType = document.getElementById('testType').value;
     document.getElementById('testContent').innerHTML = '<p class="loading">Generating test...</p>';
-    
+
     try {{
         const response = await fetch(`${{API_PREFIX}}/tests/create`, {{
             method: 'POST',
             headers: {{'Content-Type': 'application/json'}},
-            body: JSON.stringify({{num_questions: parseInt(num)}})
+            body: JSON.stringify({{num_questions: parseInt(num), test_type: testType, topics: selectedTopics()}})
         }});
         const test = await response.json();
-        
+
         let html = `<h3>Test created with ${{test.question_count || 0}} questions</h3>`;
-        if (test.questions) {{
+        if (test.questions && test.questions.length > 0) {{
             test.questions.forEach((q, i) => {{
-                html += `<div class="question">
-                    <strong>Q${{i+1}}: ${{q.text}}</strong>`;
-                if (q.options) {{
-                    q.options.forEach((opt, j) => {{
-                        html += `<div class="option"><input type="radio" name="q${{i}}" value="${{j}}" /> ${{opt}}</div>`;
+                const questionText = q.text || q.question || 'Question text not found';
+                let options = q.options || [];
+
+                if (options.length === 0 && q.distractors && q.correct) {{
+                    options = [q.correct, ...q.distractors];
+                    for (let j = options.length - 1; j > 0; j--) {{
+                        const k = Math.floor(Math.random() * (j + 1));
+                        [options[j], options[k]] = [options[k], options[j]];
+                    }}
+                }}
+
+                html += `<div class="question" style="border-left: 4px solid #3498db; padding: 15px; margin: 10px 0; background: #f8f9fa;">
+                    <strong style="font-size: 1.1em;">Q${{i+1}}: ${{questionText}}</strong><br/>`;
+
+                if (options.length > 0) {{
+                    const optLetters = ['A', 'B', 'C', 'D'];
+                    options.forEach((opt, j) => {{
+                        html += `<div class="option" style="margin-top: 8px;">
+                            <input type="radio" name="q${{i}}" value="${{j}}" id="q${{i}}_opt${{j}}" />
+                            <label for="q${{i}}_opt${{j}}" style="cursor: pointer;">${{optLetters[j]}}) ${{opt}}</label>
+                        </div>`;
                     }});
+                }} else {{
+                    html += `<p style="color: red;">No options available</p>`;
+                }}
+
+                if (q.explanation) {{
+                    html += `<small style="color: #666; display: block; margin-top: 8px;"><em>Explanation: ${{q.explanation}}</em></small>`;
+                }}
+                if (q.citation) {{
+                    html += `<small style="color: #999; display: block;"><em>Source: ${{q.citation}}</em></small>`;
                 }}
                 html += '</div>';
             }});
-            html += '<button class="test-btn" onclick="submitTest()">Submit</button>';
+            html += '<button class="test-btn" style="margin-top: 20px; padding: 10px 20px; font-size: 1em;" onclick="submitTest()">Submit Test</button>';
+        }} else {{
+            html += '<p style="color: red;">No questions were generated. Please try again or check your topic selection.</p>';
         }}
         document.getElementById('testContent').innerHTML = html;
     }} catch (e) {{
         document.getElementById('testContent').innerHTML = `<p class="error">Error: ${{e.message}}</p>`;
     }}
+}}
+
+async function createFlashcardSet() {{
+    const name = document.getElementById('setName').value.trim();
+    const fcType = document.getElementById('flashcardType').value;
+
+    if (!name) {{ alert('Please enter a set name'); return; }}
+
+    document.getElementById('flashcardsContent').innerHTML = '<p class="loading">Creating flashcard set...</p>';
+
+    try {{
+        const response = await fetch(`${{API_PREFIX}}/flashcards/sets`, {{
+            method: 'POST',
+            headers: {{'Content-Type': 'application/json'}},
+            body: JSON.stringify({{
+                name: name,
+                type: fcType,
+                topics: selectedTopics()
+            }})
+        }});
+        const data = await response.json();
+
+        if (data.id) {{
+            document.getElementById('flashcardsContent').innerHTML = `
+                <div class="success">✓ Flashcard set created: "${{data.name}}" (${{data.card_count}} cards)</div>
+                <p><strong>Set ID:</strong> ${{data.id}}</p>
+                <button class="test-btn" onclick="viewFlashcardSet(${{data.id}})">View Cards</button>
+            `;
+            document.getElementById('setName').value = '';
+        }} else {{
+            throw new Error(data.detail || 'Failed to create set');
+        }}
+    }} catch (e) {{
+        document.getElementById('flashcardsContent').innerHTML = `<p class="error">Error: ${{e.message}}</p>`;
+    }}
+}}
+
+function viewFlashcardSet(setId) {{
+    alert('Flashcard set ' + setId + ' - Feature coming soon!');
 }}
 
 window.onload = function() {{
@@ -309,6 +440,7 @@ window.onload = function() {{
         document.getElementById('loginPage').style.display = 'none';
         document.getElementById('mainPage').style.display = 'block';
         document.getElementById('userGreeting').textContent = `Welcome, ${{user}}!`;
+        loadTopics();
     }}
 }};
 </script>
@@ -339,18 +471,26 @@ for system_key, system in SYSTEMS.items():
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
-    @app.get(f"/{system_key}/api/topics")
-    async def list_topics(key=system_key, sys=system):
-        """Get available topics for filtering quizzes."""
-        try:
-            session = sys["get_session"]()
-            concept_model = sys["concept_model"]
-            topics = session.query(concept_model.topic).distinct().filter(concept_model.topic != None).all()
-            session.close()
-            topic_list = sorted(list(set([t[0] for t in topics])))
-            return {"topics": topic_list}
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
+    if system_key == "econ":
+         @app.get(f"/{system_key}/api/topics")
+         async def list_topics(key=system_key, sys=system):
+             """Get available topics for filtering quizzes."""
+             try:
+                 session = sys["get_session"]()
+                 concept_model = sys.get("concept_model")
+                 topic_list = []
+                 if concept_model is not None:
+                     topics = session.query(concept_model.topic).distinct().filter(concept_model.topic != None).all()
+                     topic_list = [t[0] for t in topics if t[0]]
+                 if not topic_list:
+                     from sqlalchemy import text
+                     rows = session.execute(text("SELECT DISTINCT topic FROM chunks WHERE topic IS NOT NULL")).fetchall()
+                     topic_list = [r[0] for r in rows if r[0]]
+                 session.close()
+                 topic_list = sorted(list(set(topic_list)))
+                 return {"topics": topic_list}
+             except Exception as e:
+                 raise HTTPException(status_code=500, detail=str(e))
 
     @app.post(f"/{system_key}/api/tests/create")
     async def create_test(request: TestRequest, key=system_key, sys=system):
@@ -369,6 +509,31 @@ for system_key, system in SYSTEMS.items():
             }
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
+import importlib.util
+from pathlib import Path as _Path
+
+def _load_fastapi_app(py_file: str, mod_name: str):
+    spec = importlib.util.spec_from_file_location(mod_name, py_file)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod.app
+
+_web_dir = _Path(__file__).resolve().parent
+_projects = _web_dir.parent.parent  # .../projects
+
+try:
+    econ_full_app = _load_fastapi_app(str(_web_dir / "econ_app.py"), "econ_full_app")
+    app.mount("/econ", econ_full_app)
+    print("MOUNTED /econ -> econ_app.py")
+except Exception as e:
+    print("ECON MOUNT FAILED:", type(e).__name__, e)
+
+try:
+    nursing_full_app = _load_fastapi_app(str(_projects / "nursing-rag" / "web" / "app.py"), "nursing_full_app")
+    app.mount("/nursing", nursing_full_app)
+    print("MOUNTED /nursing -> nursing-rag/web/app.py")
+except Exception as e:
+    print("NURSING MOUNT FAILED:", type(e).__name__, e)
 
 if __name__ == "__main__":
     import uvicorn
