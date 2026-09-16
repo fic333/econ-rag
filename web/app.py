@@ -11,17 +11,18 @@ import os
 # Import both RAG systems
 from econ_rag.services.rag_engine import RAGEngine as EconRAGEngine
 from econ_rag.services.test_generator import TestGenerator as EconTestGenerator
-from econ_rag.database import get_session as econ_get_session, Document as EconDocument
+from econ_rag.database import get_session as econ_get_session, Document as EconDocument, Concept as EconConcept
 from econ_rag.config import settings as econ_settings
 
 try:
     from nursing_rag.services.rag_engine import RAGEngine as NursingRAGEngine
     from nursing_rag.services.test_generator import TestGenerator as NursingTestGenerator
-    from nursing_rag.database import get_session as nursing_get_session, Document as NursingDocument
+    from nursing_rag.database import get_session as nursing_get_session, Document as NursingDocument, Concept as NursingConcept
     from nursing_rag.config import settings as nursing_settings
     NURSING_AVAILABLE = True
 except ImportError:
     NURSING_AVAILABLE = False
+    NursingConcept = None
 
 # Initialize FastAPI
 app = FastAPI(
@@ -30,15 +31,32 @@ app = FastAPI(
     description="Unified interface for multiple RAG systems"
 )
 
-# RAG system registry
+# Lazy-loaded engine instances
+_engines = {}
+
+def get_system_engines(system_key):
+    """Get or create RAG engines for a system."""
+    if system_key not in _engines:
+        if system_key == "econ":
+            _engines[system_key] = {
+                "rag_engine": EconRAGEngine(),
+                "test_generator": EconTestGenerator(),
+            }
+        elif system_key == "nursing":
+            _engines[system_key] = {
+                "rag_engine": NursingRAGEngine(),
+                "test_generator": NursingTestGenerator(),
+            }
+    return _engines[system_key]
+
+# RAG system registry (metadata only, engines lazy-loaded)
 SYSTEMS = {
     "econ": {
         "name": "Economics RAG",
         "description": "ECON 154: The Global Economy",
-        "rag_engine": EconRAGEngine(),
-        "test_generator": EconTestGenerator(),
         "get_session": econ_get_session,
         "document_model": EconDocument,
+        "concept_model": EconConcept,
         "color": "#3498db",
     },
 }
@@ -47,10 +65,9 @@ if NURSING_AVAILABLE:
     SYSTEMS["nursing"] = {
         "name": "Nursing RAG",
         "description": "Nursing Knowledge System",
-        "rag_engine": NursingRAGEngine(),
-        "test_generator": NursingTestGenerator(),
         "get_session": nursing_get_session,
         "document_model": NursingDocument,
+        "concept_model": NursingConcept,
         "color": "#e74c3c",
     }
 
@@ -311,7 +328,8 @@ for system_key, system in SYSTEMS.items():
     async def ask_system(request: QueryRequest, key=system_key, sys=system):
         """Query the RAG system."""
         try:
-            rag = sys["rag_engine"]
+            engines = get_system_engines(key)
+            rag = engines["rag_engine"]
             result = rag.query(request.question, top_k=request.top_k)
             return {
                 "answer": result.get("answer", "No answer found"),
@@ -320,17 +338,34 @@ for system_key, system in SYSTEMS.items():
             }
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
-    
+
+    @app.get(f"/{system_key}/api/topics")
+    async def list_topics(key=system_key, sys=system):
+        """Get available topics for filtering quizzes."""
+        try:
+            session = sys["get_session"]()
+            concept_model = sys["concept_model"]
+            topics = session.query(concept_model.topic).distinct().filter(concept_model.topic != None).all()
+            session.close()
+            topic_list = sorted(list(set([t[0] for t in topics])))
+            return {"topics": topic_list}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
     @app.post(f"/{system_key}/api/tests/create")
     async def create_test(request: TestRequest, key=system_key, sys=system):
         """Generate a test for the RAG system."""
         try:
-            gen = sys["test_generator"]
-            # Mock test generation - adapt to actual system API
+            engines = get_system_engines(key)
+            gen = engines["test_generator"]
+            questions = gen.build_questions(
+                num_questions=request.num_questions,
+                topics=request.topics
+            )
             return {
                 "test_id": 1,
-                "question_count": request.num_questions,
-                "questions": []
+                "question_count": len(questions),
+                "questions": questions
             }
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
