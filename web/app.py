@@ -189,7 +189,7 @@ body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans
 .nav-tabs button.active {{ background: {color}; color: white; border-color: {color}; }}
 .tab-content {{ display: none; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
 .tab-content.active {{ display: block; }}
-input, select {{ width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 4px; margin-bottom: 15px; font-size: 16px; }}
+input, select {{ width: 100%; max-width: 400px; padding: 12px; border: 2px solid #ddd; border-radius: 4px; margin-bottom: 15px; font-size: 16px; }}
 button.search-btn, button.test-btn {{ background: {color}; color: white; padding: 12px 30px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: bold; width: auto; }}
 button.search-btn:hover, button.test-btn:hover {{ background: {color}cc; }}
 .result-item, .test-item {{ background: #f9f9f9; padding: 20px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid {color}; }}
