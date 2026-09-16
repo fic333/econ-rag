@@ -495,27 +495,36 @@ for system_key in AVAILABLE_SYSTEMS:
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
-    if system_key == "econ":
-         @app.get(f"/{system_key}/api/topics")
-         async def list_topics(key=system_key):
-             """Get available topics for filtering quizzes."""
-             try:
-                 sys = get_system_metadata(key)
-                 session = sys["get_session"]()
-                 concept_model = sys.get("concept_model")
-                 topic_list = []
-                 if concept_model is not None:
-                     topics = session.query(concept_model.topic).distinct().filter(concept_model.topic != None).all()
-                     topic_list = [t[0] for t in topics if t[0]]
-                 if not topic_list:
-                     from sqlalchemy import text
-                     rows = session.execute(text("SELECT DISTINCT topic FROM chunks WHERE topic IS NOT NULL")).fetchall()
-                     topic_list = [r[0] for r in rows if r[0]]
-                 session.close()
-                 topic_list = sorted(list(set(topic_list)))
-                 return {"topics": topic_list}
-             except Exception as e:
-                 raise HTTPException(status_code=500, detail=str(e))
+    @app.get(f"/{system_key}/api/topics")
+    async def list_topics(key=system_key):
+        """Get available topics for filtering quizzes."""
+        try:
+            sys = get_system_metadata(key)
+            session = sys["get_session"]()
+            concept_model = sys.get("concept_model")
+            topic_list = []
+
+            # Try concept model first (econ)
+            if concept_model is not None:
+                topics = session.query(concept_model.topic).distinct().filter(concept_model.topic != None).all()
+                topic_list = [t[0] for t in topics if t[0]]
+
+            # Fall back to chunks table - use appropriate column per system
+            if not topic_list:
+                from sqlalchemy import text
+                if key == "econ":
+                    rows = session.execute(text("SELECT DISTINCT topic FROM chunks WHERE topic IS NOT NULL")).fetchall()
+                elif key == "nursing":
+                    rows = session.execute(text("SELECT DISTINCT section_title FROM chunks WHERE section_title IS NOT NULL")).fetchall()
+                else:
+                    rows = []
+                topic_list = [r[0] for r in rows if r[0]]
+
+            session.close()
+            topic_list = sorted(list(set(topic_list)))
+            return {"topics": topic_list}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
     @app.post(f"/{system_key}/api/tests/create")
     async def create_test(request: TestRequest, key=system_key):
