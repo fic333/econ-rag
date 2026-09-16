@@ -246,7 +246,7 @@ function switchMode(mode) {
 }
 
 async function loadFlashcardSets() {
-    const response = await fetch("/econ/api/flashcards/sets");
+    const response = await fetch("/api/flashcards/sets");
     const sets = await response.json();
     const select = document.getElementById("flashcardSetSelect");
     select.innerHTML = '<option value="">Create a new set...</option>';
@@ -323,7 +323,7 @@ async function createFlashcardSet() {
 
     const topics = selectedTopics.length > 0 ? selectedTopics : null;
 
-    const response = await fetch("/econ/api/flashcards/sets", {
+    const response = await fetch("/api/flashcards/sets", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({ name, topics })
@@ -339,7 +339,7 @@ async function loadFlashcardSet() {
     const setId = document.getElementById("flashcardSetSelect").value;
     if (!setId) return;
     
-    const response = await fetch(`/econ/api/flashcards/sets/${setId}`);
+    const response = await fetch(`/api/flashcards/sets/${setId}`);
     currentFlashcardSet = await response.json();
     currentCardIndex = 0;
     displayCard();
@@ -427,7 +427,7 @@ async function generateQuiz() {
 
     document.getElementById("quizContent").innerHTML = "<p>Generating quiz...</p>";
 
-    const response = await fetch("/econ/api/tests/create", {
+    const response = await fetch("/api/tests/create", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({
@@ -445,7 +445,7 @@ async function search() {
     
     document.getElementById("searchResults").innerHTML = "<p>Searching...</p>";
     
-    const response = await fetch("/econ/api/ask", {
+    const response = await fetch("/api/ask", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({ question: query })

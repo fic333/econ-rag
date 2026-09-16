@@ -84,7 +84,7 @@ tunnel: $TUNNEL_ID
 credentials-file: /Users/michaelficociello/.cloudflared/${TUNNEL_ID}.json
 
 ingress:
-  - hostname: $TUNNEL_NAME.pages.dev
+  - hostname: $TUNNEL_NAME.michaelficociello.com
     service: http://localhost:8100
   - service: http_status:404
 CONFIGEOF

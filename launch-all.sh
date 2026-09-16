@@ -55,7 +55,7 @@ echo -e "${BLUE}🔗 Starting Cloudflare tunnel...${NC}"
 sleep 1
 
 # Run the persistent tunnel
-cloudflared tunnel run $TUNNEL_NAME &
+cloudflared tunnel --config ~/.cloudflared/config.yml run $TUNNEL_NAME &
 TUNNEL_PID=$!
 
 echo ""

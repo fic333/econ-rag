@@ -111,15 +111,19 @@ class TestRequest(BaseModel):
 async def root():
     """Hub page listing available RAG systems."""
     systems_html = ""
-    for key, system in SYSTEMS.items():
-        systems_html += f"""
+    for system_key in AVAILABLE_SYSTEMS:
+        try:
+            system = get_system_metadata(system_key)
+            systems_html += f"""
         <div class="system-card">
             <div class="system-color" style="background: {system['color']};"></div>
             <h3>{system['name']}</h3>
-            <p>{system['description']}</p>
-            <a href="/{key}/" class="btn">Open</a>
+            <p>{system_key.title()} RAG System</p>
+            <a href="/{system_key}/" class="btn">Open</a>
         </div>
         """
+        except Exception as e:
+            pass
     
     html = f"""<!DOCTYPE html>
 <html>
