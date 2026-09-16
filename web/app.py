@@ -48,7 +48,13 @@ def load_system(system_key: str) -> Dict[str, Any]:
             from nursing_rag.services.test_generator import TestGenerator as NursingTestGenerator
             from nursing_rag.database import get_session as nursing_get_session, Document as NursingDocument
             from nursing_rag.config import settings as nursing_settings
-            from nursing_rag.database import Concept as NursingConcept
+
+            # Nursing doesn't have a Concept model - handle gracefully
+            NursingConcept = None
+            try:
+                from nursing_rag.database import Concept as NursingConcept
+            except ImportError:
+                pass
 
             _loaded_systems["nursing"] = {
                 "rag_engine_class": NursingRAGEngine,
