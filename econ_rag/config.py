@@ -9,7 +9,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 class Settings(BaseSettings):
     """Runtime settings, overridable via environment variables or .env."""
 
-    DATABASE_URL: str = f"sqlite:///{PROJECT_ROOT / 'econ_rag.db'}"
+    DATABASE_URL: str = "mssql+pymssql://ragadmin:aiRAGinfo4$tudents!@sqlraghub16907.database.windows.net:1433/econ_rag"
     EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"
 
     API_HOST: str = "127.0.0.1"
