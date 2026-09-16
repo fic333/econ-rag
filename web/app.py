@@ -1,79 +1,89 @@
-"""Unified FastAPI web server for multiple RAG systems (Economics, Nursing, etc.)."""
+"""Unified FastAPI hub for isolated RAG systems (Economics, Nursing, etc.)."""
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from typing import List, Optional
-from pathlib import Path
+from typing import List, Optional, Dict, Any
 import os
 
-# Import both RAG systems
-from econ_rag.services.rag_engine import RAGEngine as EconRAGEngine
-from econ_rag.services.test_generator import TestGenerator as EconTestGenerator
-from econ_rag.database import get_session as econ_get_session, Document as EconDocument, Concept as EconConcept
-from econ_rag.config import settings as econ_settings
+# Lazy-loaded system modules - loaded ONLY when needed
+_loaded_systems: Dict[str, Any] = {}
 
-try:
-    from nursing_rag.services.rag_engine import RAGEngine as NursingRAGEngine
-    from nursing_rag.services.test_generator import TestGenerator as NursingTestGenerator
-    from nursing_rag.database import get_session as nursing_get_session, Document as NursingDocument
-    from nursing_rag.config import settings as nursing_settings
-    try:
-        from nursing_rag.database import Concept as NursingConcept
-    except ImportError:
-        NursingConcept = None
-    NURSING_AVAILABLE = True
-except Exception as e:
-    NURSING_AVAILABLE = False
-    NursingConcept = None
-    print("NURSING DISABLED:", type(e).__name__, e)
-
-# Initialize FastAPI
+# Initialize FastAPI hub
 app = FastAPI(
     title="RAG Systems Hub",
     version="1.0.0",
-    description="Unified interface for multiple RAG systems"
+    description="Unified interface for isolated RAG systems"
 )
 
-# Lazy-loaded engine instances
+# Per-system lazy-loaded engines
 _engines = {}
 
+def load_system(system_key: str) -> Dict[str, Any]:
+    """Lazy-load a system ONLY when first accessed."""
+    if system_key in _loaded_systems:
+        return _loaded_systems[system_key]
+
+    if system_key == "econ":
+        from econ_rag.services.rag_engine import RAGEngine as EconRAGEngine
+        from econ_rag.services.test_generator import TestGenerator as EconTestGenerator
+        from econ_rag.database import get_session as econ_get_session, Document as EconDocument, Concept as EconConcept
+        from econ_rag.config import settings as econ_settings
+
+        _loaded_systems["econ"] = {
+            "rag_engine_class": EconRAGEngine,
+            "test_generator_class": EconTestGenerator,
+            "get_session": econ_get_session,
+            "document_model": EconDocument,
+            "concept_model": EconConcept,
+            "settings": econ_settings,
+            "name": "Economics RAG",
+            "color": "#3498db",
+        }
+        return _loaded_systems["econ"]
+
+    elif system_key == "nursing":
+        try:
+            from nursing_rag.services.rag_engine import RAGEngine as NursingRAGEngine
+            from nursing_rag.services.test_generator import TestGenerator as NursingTestGenerator
+            from nursing_rag.database import get_session as nursing_get_session, Document as NursingDocument
+            from nursing_rag.config import settings as nursing_settings
+            from nursing_rag.database import Concept as NursingConcept
+
+            _loaded_systems["nursing"] = {
+                "rag_engine_class": NursingRAGEngine,
+                "test_generator_class": NursingTestGenerator,
+                "get_session": nursing_get_session,
+                "document_model": NursingDocument,
+                "concept_model": NursingConcept,
+                "settings": nursing_settings,
+                "name": "Nursing RAG",
+                "color": "#e74c3c",
+            }
+            return _loaded_systems["nursing"]
+        except Exception as e:
+            raise HTTPException(status_code=503, detail=f"Nursing RAG not available: {e}")
+
 def get_system_engines(system_key):
-    """Get or create RAG engines for a system."""
+    """Get or create engines for a system (only after system is loaded)."""
     if system_key not in _engines:
-        if system_key == "econ":
-            _engines[system_key] = {
-                "rag_engine": EconRAGEngine(),
-                "test_generator": EconTestGenerator(),
-            }
-        elif system_key == "nursing":
-            _engines[system_key] = {
-                "rag_engine": NursingRAGEngine(),
-                "test_generator": NursingTestGenerator(),
-            }
+        sys = load_system(system_key)  # This loads the system if not already loaded
+        _engines[system_key] = {
+            "rag_engine": sys["rag_engine_class"](),
+            "test_generator": sys["test_generator_class"](),
+        }
     return _engines[system_key]
 
-# RAG system registry (metadata only, engines lazy-loaded)
-SYSTEMS = {
-    "econ": {
-        "name": "Economics RAG",
-        "description": "ECON 154: The Global Economy",
-        "get_session": econ_get_session,
-        "document_model": EconDocument,
-        "concept_model": EconConcept,
-        "color": "#3498db",
-    },
-}
-
-if NURSING_AVAILABLE:
-    SYSTEMS["nursing"] = {
-        "name": "Nursing RAG",
-        "description": "Nursing Knowledge System",
-        "get_session": nursing_get_session,
-        "document_model": NursingDocument,
-        "concept_model": NursingConcept,
-        "color": "#e74c3c",
+def get_system_metadata(system_key):
+    """Get system metadata (triggers load if needed)."""
+    sys = load_system(system_key)
+    return {
+        "name": sys["name"],
+        "description": sys["name"],
+        "get_session": sys["get_session"],
+        "document_model": sys["document_model"],
+        "concept_model": sys["concept_model"],
+        "color": sys["color"],
     }
 
 # Request/Response models
@@ -448,16 +458,20 @@ window.onload = function() {{
 </html>"""
     return html
 
-# Create sub-routers for each RAG system
-for system_key, system in SYSTEMS.items():
+# Define available systems
+AVAILABLE_SYSTEMS = ["econ", "nursing"]
+
+# Create sub-routers for each RAG system (lazy-loaded on first access)
+for system_key in AVAILABLE_SYSTEMS:
     
     @app.get(f"/{system_key}/", response_class=HTMLResponse)
-    async def system_ui(key=system_key, sys=system):
+    async def system_ui(key=system_key):
         """Render UI for a specific RAG system."""
+        sys = get_system_metadata(key)
         return generate_rag_ui(key, sys)
     
     @app.post(f"/{system_key}/api/ask")
-    async def ask_system(request: QueryRequest, key=system_key, sys=system):
+    async def ask_system(request: QueryRequest, key=system_key):
         """Query the RAG system."""
         try:
             engines = get_system_engines(key)
@@ -473,9 +487,10 @@ for system_key, system in SYSTEMS.items():
 
     if system_key == "econ":
          @app.get(f"/{system_key}/api/topics")
-         async def list_topics(key=system_key, sys=system):
+         async def list_topics(key=system_key):
              """Get available topics for filtering quizzes."""
              try:
+                 sys = get_system_metadata(key)
                  session = sys["get_session"]()
                  concept_model = sys.get("concept_model")
                  topic_list = []
@@ -493,7 +508,7 @@ for system_key, system in SYSTEMS.items():
                  raise HTTPException(status_code=500, detail=str(e))
 
     @app.post(f"/{system_key}/api/tests/create")
-    async def create_test(request: TestRequest, key=system_key, sys=system):
+    async def create_test(request: TestRequest, key=system_key):
         """Generate a test for the RAG system."""
         try:
             engines = get_system_engines(key)
